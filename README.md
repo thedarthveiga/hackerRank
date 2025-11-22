@@ -41,4 +41,4 @@ To fully protect your `main` and `develop` branches, you must configure Branch P
 We use ArchUnit to enforce:
 - **Naming Conventions**: Classes in `problemSolving.algorithms` must end with `Algorithm`.
 - **Cyclic Dependencies**: No cycles allowed in `problemSolving` packages.
-- **Field Injection**: No `@Autowired` on fields (use constructor injection).
+- **Field Injection**: No `@Autowired` on fields for while(use constructor injection).
