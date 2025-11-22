@@ -1,0 +1,92 @@
+name: Java CI with Maven
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/*" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+        
+    - name: Check Branch Naming Convention
+      if: github.event_name == 'pull_request'
+      run: |
+        HEAD_REF="${{ github.head_ref }}"
+        BASE_REF="${{ github.base_ref }}"
+        echo "Checking PR: $HEAD_REF -> $BASE_REF"
+        
+        if [[ "$BASE_REF" == "main" ]]; then
+          if [[ "$HEAD_REF" != "develop" ]]; then
+            echo "Error: Only 'develop' branch can be merged into 'main'."
+            exit 1
+          fi
+        elif [[ "$BASE_REF" == "develop" ]]; then
+          if [[ ! "$HEAD_REF" =~ ^feature/ ]]; then
+            echo "Error: Only branches starting with 'feature/' can be merged into 'develop'."
+            exit 1
+          fi
+        fi
+        
+    - name: Build with Maven
+      run: mvn clean package --file pom.xml
+
+    - name: Create Pull Request
+      if: success() && github.event_name == 'push'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { repo, owner } = context.repo;
+          const branch = context.ref.replace('refs/heads/', '');
+          
+          let base = '';
+          if (branch === 'develop') {
+            base = 'main';
+          } else if (branch.startsWith('feature/')) {
+            base = 'develop';
+          } else {
+            console.log(`Branch '${branch}' does not match patterns 'develop' or 'feature/*'. Skipping PR creation.`);
+            return;
+          }
+          
+          console.log(`Creating PR from ${branch} to ${base}`);
+          
+          try {
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              head: `${owner}:${branch}`,
+              base: base,
+              state: 'open'
+            });
+            
+            if (prs.length > 0) {
+              console.log('PR already exists');
+              return;
+            }
+            
+            await github.rest.pulls.create({
+              owner,
+              repo,
+              head: branch,
+              base: base,
+              title: `Auto PR: ${branch} to ${base}`,
+              body: `Automated PR created after successful CI run on ${branch}.`
+            });
+          } catch (error) {
+            console.log('Error creating PR:', error);
+          }
