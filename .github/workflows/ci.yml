@@ -10,6 +10,9 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
     - uses: actions/checkout@v3
@@ -41,3 +44,49 @@ jobs:
         
     - name: Build with Maven
       run: mvn clean package --file pom.xml
+
+    - name: Create Pull Request
+      if: success() && github.event_name == 'push'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { repo, owner } = context.repo;
+          const branch = context.ref.replace('refs/heads/', '');
+          
+          let base = '';
+          if (branch === 'develop') {
+            base = 'main';
+          } else if (branch.startsWith('feature/')) {
+            base = 'develop';
+          } else {
+            console.log(`Branch '${branch}' does not match patterns 'develop' or 'feature/*'. Skipping PR creation.`);
+            return;
+          }
+          
+          console.log(`Creating PR from ${branch} to ${base}`);
+          
+          try {
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              head: `${owner}:${branch}`,
+              base: base,
+              state: 'open'
+            });
+            
+            if (prs.length > 0) {
+              console.log('PR already exists');
+              return;
+            }
+            
+            await github.rest.pulls.create({
+              owner,
+              repo,
+              head: branch,
+              base: base,
+              title: `Auto PR: ${branch} to ${base}`,
+              body: `Automated PR created after successful CI run on ${branch}.`
+            });
+          } catch (error) {
+            console.log('Error creating PR:', error);
+          }
