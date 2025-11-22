@@ -24,12 +24,12 @@ jobs:
             const branch = context.payload.workflow_run.head_branch;
             
             let base = '';
-            if (branch === 'dev') {
+            if (branch === 'develop') {
               base = 'main';
-            } else if (branch !== 'main') {
-              base = 'dev';
+            } else if (branch.startsWith('feature/')) {
+              base = 'develop';
             } else {
-              console.log('Branch is main, no PR needed.');
+              console.log(`Branch '${branch}' does not match patterns 'develop' or 'feature/*'. Skipping PR creation.`);
               return;
             }
             

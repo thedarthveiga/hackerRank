@@ -2,9 +2,9 @@ name: Java CI with Maven
 
 on:
   push:
-    branches: [ "main", "dev", "feature/*" ]
+    branches: [ "main", "develop", "feature/*" ]
   pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "develop" ]
 
 jobs:
   build:
@@ -14,10 +14,30 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Set up JDK 21
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
         cache: maven
+        
+    - name: Check Branch Naming Convention
+      if: github.event_name == 'pull_request'
+      run: |
+        HEAD_REF="${{ github.head_ref }}"
+        BASE_REF="${{ github.base_ref }}"
+        echo "Checking PR: $HEAD_REF -> $BASE_REF"
+        
+        if [[ "$BASE_REF" == "main" ]]; then
+          if [[ "$HEAD_REF" != "develop" ]]; then
+            echo "Error: Only 'develop' branch can be merged into 'main'."
+            exit 1
+          fi
+        elif [[ "$BASE_REF" == "develop" ]]; then
+          if [[ ! "$HEAD_REF" =~ ^feature/ ]]; then
+            echo "Error: Only branches starting with 'feature/' can be merged into 'develop'."
+            exit 1
+          fi
+        fi
+        
     - name: Build with Maven
-      run: mvn -B package --file pom.xml
+      run: mvn clean package --file pom.xml
