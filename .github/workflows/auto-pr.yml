@@ -1,0 +1,62 @@
+name: Auto Pull Request
+
+on:
+  workflow_run:
+    workflows: ["Java CI with Maven"]
+    types:
+      - completed
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Create Pull Request
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { repo, owner } = context.repo;
+            const branch = context.payload.workflow_run.head_branch;
+            
+            let base = '';
+            if (branch === 'dev') {
+              base = 'main';
+            } else if (branch !== 'main') {
+              base = 'dev';
+            } else {
+              console.log('Branch is main, no PR needed.');
+              return;
+            }
+            
+            console.log(`Creating PR from ${branch} to ${base}`);
+            
+            try {
+              const { data: prs } = await github.rest.pulls.list({
+                owner,
+                repo,
+                head: `${owner}:${branch}`,
+                base: base,
+                state: 'open'
+              });
+              
+              if (prs.length > 0) {
+                console.log('PR already exists');
+                return;
+              }
+              
+              await github.rest.pulls.create({
+                owner,
+                repo,
+                head: branch,
+                base: base,
+                title: `Auto PR: ${branch} to ${base}`,
+                body: `Automated PR created after successful CI run on ${branch}.`
+              });
+            } catch (error) {
+              console.log('Error creating PR:', error);
+            }

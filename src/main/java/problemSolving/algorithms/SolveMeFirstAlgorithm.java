@@ -16,13 +16,14 @@ public class SolveMeFirstAlgorithm {
      * b = 3
      * Sample Output
      * 5
+     *
      * @param a
      * @param b
      * @return
      */
 
     public static int solveMeFirst(int a, int b) {
-        return a+b;
+        return a + b;
     }
 
 }
